@@ -26,11 +26,11 @@
 #define SCGI_MSG_SZ 8192
 #define SCGI_VAR_SZ 512
 
-int res;
-uint16_t pos, len;
-char buf[SCGI_MSG_SZ] = { 0 };
+static int res, conn;
+static uint16_t pos, len;
+static char buf[SCGI_MSG_SZ] = { 0 };
 
-int process( int conn ) {
+int process() {
 	//  0 - ok
 	// -1 - execution errors
 	// -2 - protocol errors
@@ -211,7 +211,7 @@ int main( int argc, char *argv[] ) {
 			return -3;
 		}
 		
-		process( conn );
+		process();
 		
 		shutdown( conn, SHUT_RDWR );
 		res = close( conn );
