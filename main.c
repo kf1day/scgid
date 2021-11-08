@@ -23,8 +23,8 @@
 #endif
 
 #define DEF_PORT 9000
-#define SCGI_MSG_SZ 8192
-#define SCGI_VAR_SZ 512
+#define SCGI_MSG_SZ 0x2000
+#define SCGI_VAR_SZ 0x200
 
 static int res, conn;
 static uint16_t pos, len;
@@ -139,15 +139,14 @@ int process() {
 
 int main( int argc, char *argv[] ) {
 	
-	int sock, conn = AF_INET;
-	struct sockaddr_in *inet_addr;
-	struct sockaddr_un *unix_addr;
+	int sock;
 	void *sock_addr;
 	socklen_t sx = 0;
 	
 	
 	pos = 0;
 	res = DEF_PORT;
+	conn = AF_INET;
 	
 	#define _ARG( S ) strcmp( argv[pos], S ) == 0
 	while ( ++pos < argc ) {
@@ -165,38 +164,36 @@ int main( int argc, char *argv[] ) {
 	
 	if ( conn == AF_UNIX ) {
 		sx = sizeof( struct sockaddr_un );
-		unix_addr = calloc( 1, sx );
-		sock_addr = (void *)unix_addr;
-		unix_addr->sun_family = AF_UNIX;
-		strcpy( unix_addr->sun_path, buf );
-		unlink( unix_addr->sun_path );
+		sock_addr = calloc( 1, sx );
+		((struct sockaddr_un*)sock_addr)->sun_family = AF_UNIX;
+		strcpy( ((struct sockaddr_un*)sock_addr)->sun_path, buf );
+		unlink( ((struct sockaddr_un*)sock_addr)->sun_path );
 		MSG_DEBUG( "configured to listen socket %s\n", buf );
 	} else {
 		sx = sizeof( struct sockaddr_in );
-		inet_addr = calloc( 1, sx );
-		sock_addr = (void *)inet_addr;
+		sock_addr = calloc( 1, sx );
 		if ( res <= 0 ) {
 			res = DEF_PORT;
 		}
-		inet_addr->sin_family = AF_INET;
-		inet_addr->sin_addr.s_addr = htonl( INADDR_ANY );
-		inet_addr->sin_port = htons( res );
+		((struct sockaddr_in*)sock_addr)->sin_family = AF_INET;
+		((struct sockaddr_in*)sock_addr)->sin_addr.s_addr = htonl( INADDR_ANY );
+		((struct sockaddr_in*)sock_addr)->sin_port = htons( res );
 		MSG_DEBUG( "configured to listen port %d\n", res );
 	}
 	
 	sock = socket( conn, SOCK_STREAM, 0 );
 	if ( sock == -1 ) {
 		MSG_FATAL( "failed to create socket\n" );
-		return res;
+		return -1;
 	}
 	
 	res = bind( sock, (struct sockaddr*)sock_addr, sx );
 	if ( res == -1 ) {
 		MSG_FATAL( "failed to bind socket\n" );
-		return res;
+		return -1;
 	}
 	if ( conn == AF_UNIX ) {
-		chmod( unix_addr->sun_path, 0666 );
+		chmod( ((struct sockaddr_un*)sock_addr)->sun_path, 0666 );
 	}
 	
 	memset( sock_addr, 0, sx );
@@ -222,7 +219,7 @@ int main( int argc, char *argv[] ) {
 	}
 	
 	shutdown( sock, SHUT_RDWR );
-	read( sock, 0, SCGI_MSG_SZ );
+	read( sock, buf, SCGI_MSG_SZ );
 	close( sock );
 
 	return 0;
